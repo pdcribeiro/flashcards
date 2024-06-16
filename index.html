@@ -1,0 +1,374 @@
+<html>
+
+<head>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<!-- Example component definition -->
+<!-- <template x-component="dropdown">
+    <div x-data="{ ...dropdown(), ...$el.parentElement.data() }">
+        <button x-on:click="open">Open</button>
+
+        <div x-show="isOpen()" x-on:click.away="close" x-text="content"></div>
+    </div>
+</template> -->
+
+<body class="flex justify-center bg-slate-100">
+    <main x-data="{
+        config: getSettings('config') ?? DEFAULT_CONFIG,
+        db: null,
+        loaded: false,
+        piles: {
+            hard: {},
+            medium: {},
+            easy: {},
+        },
+        async init() {
+            this.db = getDb(this.config.db)
+            await this.db.auth()
+
+            const cards = await this.db.cards.list()
+            for (const { it, pt, pile } of cards) {
+                this.piles[pile][it] = pt
+            }
+
+            this.loaded = true
+        },
+        saveAllSettings() {
+            saveSettings('config', this.config)
+        },
+    }" class="w-11/12 lg:w-1/2">
+        <h1 class="my-3 text-xl">Flashcards</h1>
+
+        <!-- Settings -->
+        <div x-data="toggle">
+            <button @click="toggle">Toggle settings</button>
+
+            <div x-show="enabled">
+                <div class="flex flex-col">
+                    <label>Database auth URL</label>
+                    <input x-model="config.db.authUrl" @blur="saveAllSettings" placeholder="Database auth URL"
+                        class="my-2">
+                    <label>Database API key</label>
+                    <input x-model="config.db.apiKey" @blur="saveAllSettings" placeholder="Database API key"
+                        class="my-2">
+                    <label>Database base URL</label>
+                    <input x-model="config.db.baseUrl" @blur="saveAllSettings" placeholder="Database base URL"
+                        class="my-2">
+                    <label>AI API key</label>
+                    <input x-model="config.ai.apiKey" @blur="saveAllSettings" placeholder="AI API key" class="my-2">
+                </div>
+            </div>
+        </div>
+
+        <!-- Generator -->
+        <div x-data="toggle">
+            <button @click="toggle">Toggle generator</button>
+
+            <div x-show="enabled">
+                <div x-data="{
+                    prompt: DEFAULT_PROMPT,
+                    pairs: '',
+                    async generate() {
+                        const exclude = Object.values(this.piles).map(pairs => Object.keys(pairs)).flat().join(', ')
+                        const pairs = await generatePairs(this.config.ai, {
+                            exclude,
+                            prompt: this.prompt
+                        })
+                        this.pairs = Object.entries(pairs).map(pair => pair.join(',')).join('\n')
+                    },
+                    async add() {
+                        const array = this.pairs.split('\n').map(pair => pair.split(','))
+                        const pile = 'hard'
+                        const cards = array.map(([it, pt]) => ({ it, pt, pile }))
+                        await this.db.cards.add(cards)
+                        for (const [k, v] of array) {
+                            this.piles[pile][k] = v
+                        }
+                        this.pairs = ''
+                    },
+                }" class="flex flex-col">
+                    <input x-model="config.ai.apiKey" placeholder="OpenAI API key" class="my-3">
+                    <textarea x-model="prompt" rows=5 class="my-3"></textarea>
+                    <button @click="generate" class="my-3">Generate</button>
+
+                    <textarea x-model="pairs" rows=10 class="my-3"></textarea>
+                    <button @click="add" class="my-3">Add</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards -->
+        <div x-data="toggle">
+            <button @click="toggle">Toggle cards</button>
+
+            <div x-data="{ search: '' }" x-show="enabled">
+                <input x-model="search" placeholder="Search cards...">
+                <ul>
+                    <template x-for="(pairs, pile) in piles" :key="pile">
+                        <li>
+                            <h3 x-text="pile" class="font-bold"></h3>
+                            <ul>
+                                <template
+                                    x-for="pair in Object.entries(pairs).map(pair => pair.join(',')).filter(pair => pair.includes(search))"
+                                    :key="pair">
+                                    <li x-text="pair"></li>
+                                </template>
+                            </ul>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Practice -->
+        <template x-if="!loaded"><span>Loading...</span></template>
+        <template x-if="loaded">
+            <div x-data="{
+                currentPile: 'hard',
+                pair: null,
+                peeking: false,
+                async init() {
+                    for (const pile of ['hard', 'medium', 'easy']) {
+                        if (Object.keys(this.piles[pile]).length > 0) {
+                            this.switchPile(pile)
+                            break
+                        }
+                    }
+                },
+                next() {
+                    this.peeking = false
+                    const index = Math.floor(Math.random() * this.size(this.currentPile))
+                    this.pair = Object.entries(piles[this.currentPile])[index]
+                },
+                async move(pile) {
+                    if (pile !== this.currentPile) {
+                        const [k, v] = this.pair
+                        await this.db.cards.move(k, pile)
+                        delete piles[this.currentPile][k]
+                        piles[pile][k] = v
+                    }
+                },
+                size(pile) {
+                    return Object.keys(this.piles[pile]).length
+                },
+                switchPile(pile) {
+                    this.currentPile = pile
+                    this.next()
+                },
+            }" x-init="next" class="flex flex-col items-center">
+                <div class="mb-4">
+                    <template x-for="(pairs, pile) in piles" :key="pile">
+                        <button :disabled="size(pile) === 0" :class="`mx-2 ${pile === currentPile ? 'font-bold' : ''}`"
+                            @click="switchPile(pile)" x-text="`${pile} (${size(pile)})`"></button>
+                    </template>
+                </div>
+                <template x-if="pair">
+                    <div class="flex flex-col">
+                        <span x-text="pair[1]" class="mb-2 font-bold text-center"></span>
+
+                        <div x-data="toggle" class="flex justify-center">
+                            <button x-show="!peeking" @click="peeking = true">peek answer</button>
+                            <span x-show="peeking" x-text="pair[0]" class="text-center"></span>
+                        </div>
+
+                        <div class="flex justify-center mt-4">
+                            <template x-for="(pairs, pile) in piles" :key="pile">
+                                <button @click="move(pile); next()" x-text="pile" class="mx-2"></button>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </template>
+    </main>
+</body>
+
+<script>
+    const DEFAULT_CONFIG = {
+        db: {
+            authUrl: '',
+            apiKey: '',
+            baseUrl: '',
+        },
+        ai: {
+            apiKey: '',
+        },
+    }
+    const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
+    const DEFAULT_PROMPT = 'Generate useful word pairs for a beginner learning italian'
+
+    // Load component definitions
+    // document.querySelectorAll('[x-component]').forEach(component => {
+    //     const componentName = `x-${component.getAttribute('x-component')}`
+    //     class Component extends HTMLElement {
+    //         connectedCallback() {
+    //             this.append(component.content.cloneNode(true))
+    //         }
+
+    //         data() {
+    //             const attributes = this.getAttributeNames()
+    //             const data = {}
+    //             attributes.forEach(attribute => {
+    //                 data[attribute] = this.getAttribute(attribute)
+    //             })
+    //             return data
+    //         }
+    //     }
+    //     customElements.define(componentName, Component)
+    // })
+
+    document.addEventListener('alpine:init', async () => {
+        Alpine.data('toggle', () => ({
+            enabled: false,
+            toggle() {
+                this.enabled = !this.enabled
+            }
+        }))
+    })
+
+    async function generatePairs({ apiKey }, { exclude, prompt }) {
+        const { pairs } = await chat(apiKey, [
+            {
+                role: 'system',
+                content: `You are a helpful assistant designed to generate 10 word pairs in italian and portuguese (Portugal portuguese).
+
+                    Exclude the following italian words: ${exclude}.
+
+                    You should output JSON: { "pairs": { <it_1>: <pt_1>, <it_2>: <pt_2>, ... } }.
+                `
+            },
+            { role: 'user', content: prompt }
+        ])
+        return pairs
+    }
+
+    async function chat(apiKey, messages) {
+        console.log('chat()', messages)
+        if (!apiKey) {
+            throw new Error('Missing AI API key')
+        }
+
+        // return {
+        //     pairs: {
+        //         'ciao': 'olá',
+        //         'ragazza': 'menina',
+        //         'ragazzo': 'rapaz',
+        //         'casa': 'casa',
+        //         'libro': 'livro',
+        //         'mela': 'maçã',
+        //         'gatto': 'gato',
+        //         'cane': 'cão',
+        //         'mare': 'mar',
+        //         'scuola': 'escola',
+        //     }
+        // } // DEV
+        const response = await postJson({
+            url: OPENAI_API_URL,
+            headers: {
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: {
+                model: 'gpt-3.5-turbo-0125',
+                response_format: { 'type': 'json_object' },
+                messages,
+            }
+        })
+
+        const answer = JSON.parse(response.choices[0].message.content)
+        console.log({ answer })
+        return answer
+    }
+
+    function getDb({ authUrl, apiKey, baseUrl }) {
+        if (!authUrl) {
+            throw new Error('Missing DB auth URL')
+        }
+        if (!apiKey) {
+            throw new Error('Missing DB API key')
+        }
+        if (!baseUrl) {
+            throw new Error('Missing DB base URL')
+        }
+
+        let accessToken
+
+        return {
+            auth: async function () {
+                console.log('db.auth()')
+                const response = await postJson({
+                    url: authUrl,
+                    body: {
+                        key: apiKey,
+                    },
+                })
+                accessToken = response.access_token
+                return response
+            },
+            req,
+            cards: {
+                async list() {
+                    const { documents } = await req('cards', 'find')
+                    return documents
+                },
+                async add(documents) {
+                    await req('cards', 'insertMany', { documents })
+                },
+                async move(it, pile) {
+                    await req('cards', 'updateOne', {
+                        filter: { it },
+                        update: { '$set': { pile } },
+                    })
+                },
+            },
+        }
+
+        async function req(collection, action, body) {
+            console.log('db.req()')
+            if (!accessToken) {
+                throw new Error('Please authenticate before calling the DB')
+            }
+            const response = await postJson({
+                url: `${baseUrl}/action/${action}`,
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+                body: {
+                    ...body,
+                    dataSource: 'Cluster0',
+                    database: 'flashcards',
+                    collection,
+                },
+            })
+            return response
+        }
+    }
+
+    async function postJson({ url, headers, body }) {
+        console.log('postJson()')
+        const response = await fetch(url, {
+            method: 'post',
+            headers: {
+                ...headers,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+        })
+        const json = await response.json()
+        console.log({ json })
+        return json
+    }
+
+    function saveSettings(key, data) {
+        const json = JSON.stringify(data)
+        localStorage.setItem(key, json)
+    }
+
+    function getSettings(key) {
+        const json = localStorage.getItem(key)
+        return JSON.parse(json)
+    }
+</script>
+
+</html>
