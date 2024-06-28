@@ -81,6 +81,14 @@
                     },
                     async add() {
                         const array = this.pairs.split('\n').map(pair => pair.split(','))
+                        for (const pile of PILES) {
+                            for (const [k, v] of array) {
+                                if (this.piles[pile][k]) {
+                                    alert(`Duplicate found: ${k}`)
+                                    return
+                                }
+                            }
+                        }
                         const pile = 'hard'
                         const cards = array.map(([it, pt]) => ({ it, pt, pile }))
                         await this.db.cards.add(cards)
@@ -130,7 +138,7 @@
                 pair: null,
                 peeking: false,
                 async init() {
-                    for (const pile of ['hard', 'medium', 'easy']) {
+                    for (const pile of PILES) {
                         if (Object.keys(this.piles[pile]).length > 0) {
                             this.switchPile(pile)
                             break
@@ -196,6 +204,7 @@
             apiKey: '',
         },
     }
+    const PILES = ['hard', 'medium', 'easy']
     const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
     const DEFAULT_PROMPT = 'Generate 10 useful word pairs for a beginner learning italian'
 
