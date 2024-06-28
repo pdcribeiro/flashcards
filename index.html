@@ -123,7 +123,7 @@
         </div>
 
         <!-- Practice -->
-        <template x-if="!loaded"><span>Loading...</span></template>
+        <template x-if="!loaded"><span class="block mt-12">Loading...</span></template>
         <template x-if="loaded">
             <div x-data="{
                 currentPile: 'hard',
@@ -157,7 +157,7 @@
                     this.currentPile = pile
                     this.next()
                 },
-            }" x-init="next" class="flex flex-col items-center">
+            }" x-init="next" class="flex flex-col items-center mt-12">
                 <div class="mb-4">
                     <template x-for="(pairs, pile) in piles" :key="pile">
                         <button :disabled="size(pile) === 0" :class="`mx-2 ${pile === currentPile ? 'font-bold' : ''}`"
