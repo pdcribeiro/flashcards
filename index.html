@@ -197,7 +197,7 @@
         },
     }
     const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
-    const DEFAULT_PROMPT = 'Generate useful word pairs for a beginner learning italian'
+    const DEFAULT_PROMPT = 'Generate 10 useful word pairs for a beginner learning italian'
 
     // Load component definitions
     // document.querySelectorAll('[x-component]').forEach(component => {
@@ -232,7 +232,7 @@
         const { pairs } = await chat(apiKey, [
             {
                 role: 'system',
-                content: `You are a helpful assistant designed to generate 10 word pairs in italian and portuguese (Portugal portuguese).
+                content: `You are a helpful assistant designed to generate word pairs in italian and portuguese (Portugal portuguese).
 
                     Exclude the following italian words: ${exclude}.
 
