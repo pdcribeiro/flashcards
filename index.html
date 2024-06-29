@@ -28,8 +28,9 @@
         async init() {
             this.db = getDb(this.config.db)
             await this.db.auth()
+            // await this.db.migrate()
 
-            const cards = await this.db.cards.list()
+            const cards = await this.db.cards.list({ userId: this.config.user.id })
             for (const { it, pt, pile } of cards) {
                 this.piles[pile][it] = pt
             }
@@ -203,6 +204,9 @@
         ai: {
             apiKey: '',
         },
+        user: {
+            id: ''
+        },
     }
     const PILES = ['hard', 'medium', 'easy']
     const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
@@ -304,7 +308,7 @@
         let accessToken
 
         return {
-            auth: async function () {
+            async auth() {
                 console.log('db.auth()')
                 const response = await postJson({
                     url: authUrl,
@@ -315,10 +319,23 @@
                 accessToken = response.access_token
                 return response
             },
-            req,
+            async migrate() {
+                console.log('db.migrate()')
+                await req('cards', 'updateMany', {
+                    filter: {},
+                    update: {
+                        '$set': {
+                            userId: 'diogo',
+                        },
+                        '$unset': {
+                            user_id: '',
+                        }
+                    },
+                })
+            },
             cards: {
-                async list() {
-                    const { documents } = await req('cards', 'find')
+                async list(filter = {}) {
+                    const { documents } = await req('cards', 'find', { filter })
                     return documents
                 },
                 async add(documents) {
@@ -334,7 +351,7 @@
         }
 
         async function req(collection, action, body) {
-            console.log('db.req()')
+            console.log('db.req()', { body })
             if (!accessToken) {
                 throw new Error('Please authenticate before calling the DB')
             }
@@ -376,6 +393,7 @@
 
     function getSettings(key) {
         const json = localStorage.getItem(key)
+        // return { ...JSON.parse(json), user: { id: '' } }
         return JSON.parse(json)
     }
 </script>
