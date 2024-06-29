@@ -26,6 +26,8 @@
             easy: {},
         },
         async init() {
+            this.loadSettings()
+
             this.db = getDb(this.config.db)
             await this.db.auth()
             // await this.db.migrate()
@@ -36,6 +38,17 @@
             }
 
             this.loaded = true
+        },
+        loadSettings() {
+            const param = new URLSearchParams(window.location.search).get(SETTINGS_PARAM)
+            if (param) {
+                const json = decodeURIComponent(param)
+                this.config = JSON.parse(json)
+                this.saveAllSettings()
+
+                const baseUrl = window.location.href.split('?')[0]
+                history.replaceState({}, '', baseUrl)
+            }
         },
         saveAllSettings() {
             saveSettings('config', this.config)
@@ -48,7 +61,15 @@
             <button @click="toggle">Toggle settings</button>
 
             <div x-show="enabled">
-                <div class="flex flex-col">
+                <div x-data="{
+                    shareSettings() {
+                        const json = JSON.stringify(this.config)
+                        const param = encodeURIComponent(json)
+                        const baseUrl = window.location.href.split('?')[0]
+                        const url = `${baseUrl}?${SETTINGS_PARAM}=${param}`
+                        navigator.clipboard.writeText(url)
+                    },
+                }" class="flex flex-col">
                     <label>Database auth URL</label>
                     <input x-model="config.db.authUrl" @blur="saveAllSettings" placeholder="Database auth URL"
                         class="my-2">
@@ -60,6 +81,9 @@
                         class="my-2">
                     <label>AI API key</label>
                     <input x-model="config.ai.apiKey" @blur="saveAllSettings" placeholder="AI API key" class="my-2">
+                    <label>User ID</label>
+                    <input x-model="config.user.id" @blur="saveAllSettings" placeholder="User ID" class="my-2">
+                    <button @click="shareSettings" class="my-2">Share</button>
                 </div>
             </div>
         </div>
@@ -195,6 +219,7 @@
 </body>
 
 <script>
+    const SETTINGS_PARAM = 'settings'
     const DEFAULT_CONFIG = {
         db: {
             authUrl: '',
@@ -396,6 +421,10 @@
         // return { ...JSON.parse(json), user: { id: '' } }
         return JSON.parse(json)
     }
+
+    /* TODO
+      - ? add way to easily create DB and AI accounts (instead of implementing user accounts)
+    */
 </script>
 
 </html>
