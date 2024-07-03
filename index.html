@@ -129,7 +129,8 @@
                             }
                         }
                         const pile = 'hard'
-                        const cards = array.map(([it, pt]) => ({ it, pt, pile }))
+                        const userId = this.config.user.id
+                        const cards = array.map(([it, pt]) => ({ it, pt, pile, userId }))
                         await this.db.cards.add(cards)
                         for (const [k, v] of array) {
                             this.piles[pile][k] = v
