@@ -72,19 +72,21 @@
                     },
                 }" class="flex flex-col">
                     <label>Database auth URL</label>
-                    <input x-model="config.db.authUrl" @blur="saveAllSettings" placeholder="Database auth URL"
-                        class="my-2">
+                    <input x-model="config.db.authUrl" placeholder="Database auth URL" class="my-2">
                     <label>Database API key</label>
-                    <input x-model="config.db.apiKey" @blur="saveAllSettings" placeholder="Database API key"
-                        class="my-2">
+                    <input x-model="config.db.apiKey" placeholder="Database API key" class="my-2">
                     <label>Database base URL</label>
-                    <input x-model="config.db.baseUrl" @blur="saveAllSettings" placeholder="Database base URL"
-                        class="my-2">
+                    <input x-model="config.db.baseUrl" placeholder="Database base URL" class="my-2">
                     <label>AI API key</label>
-                    <input x-model="config.ai.apiKey" @blur="saveAllSettings" placeholder="AI API key" class="my-2">
+                    <input x-model="config.ai.apiKey" placeholder="AI API key" class="my-2">
                     <label>User ID</label>
-                    <input x-model="config.user.id" @blur="saveAllSettings" placeholder="User ID" class="my-2">
-                    <button @click="shareSettings" class="my-2">Share</button>
+                    <input x-model="config.user.id" placeholder="User ID" class="my-2">
+                    <label>Google API key</label>
+                    <input x-model="config.google.apiKey" placeholder="Google API key" class="my-2">
+                    <div class="flex justify-around my-2">
+                        <button @click="saveAllSettings(); toggle()">Save</button>
+                        <button @click="shareSettings">Share</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -107,6 +109,14 @@
                             prompt: this.prompt
                         })
                         this.pairs = Object.entries(pairs).map(pair => pair.join(',')).join('\n')
+                    },
+                    async translate() {
+                        const array = this.pairs.split('\n').map(pair => pair.split(','))
+                        const textsToTranslate = []
+                        array.forEach(([k, v], i) => v || textsToTranslate.push({ text: k, arrayIndex: i }))
+                        const translated = await translateTexts(this.config.google.apiKey, textsToTranslate.map(t => t.text))
+                        textsToTranslate.forEach(({ text, arrayIndex }, i) => array[arrayIndex] = [text, translated[i]])
+                        this.pairs = array.map(pair => pair.join(',')).join('\n')
                     },
                     async add() {
                         const array = this.pairs.split('\n').map(pair => pair.split(','))
@@ -131,7 +141,10 @@
                     <button @click="generate" class="my-3">Generate</button>
 
                     <textarea x-model="pairs" rows=10 class="my-3"></textarea>
-                    <button @click="add" class="my-3">Add</button>
+                    <div class="flex justify-around my-3">
+                        <button @click="translate">Translate</button>
+                        <button @click="add">Add</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -234,12 +247,16 @@
             apiKey: '',
         },
         user: {
-            id: ''
+            id: '',
+        },
+        google: {
+            apiKey: '',
         },
     }
     const PILES = ['hard', 'medium', 'easy']
     const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
     const DEFAULT_PROMPT = 'Generate 10 useful word pairs for a beginner learning italian'
+    const TRANSLATE_URL = 'https://translation.googleapis.com/language/translate/v2'
 
     // Load component definitions
     // document.querySelectorAll('[x-component]').forEach(component => {
@@ -323,6 +340,21 @@
         return answer
     }
 
+    async function translateTexts(apiKey, textList) {
+        console.log('translate()')
+        const response = await postJson({
+            url: TRANSLATE_URL,
+            query: {
+                q: textList,
+                source: 'it',
+                target: 'pt',
+                key: apiKey,
+            }
+        })
+        // return response.data.translations.map(t => t.translatedText)
+        return response.data.translations[0].translatedText.split(', ')
+    }
+
     function getDb({ authUrl, apiKey, baseUrl }) {
         if (!authUrl) {
             throw new Error('Missing DB auth URL')
@@ -400,9 +432,13 @@
         }
     }
 
-    async function postJson({ url, headers, body }) {
+    async function postJson({ url, query, headers, body }) {
         console.log('postJson()')
-        const response = await fetch(url, {
+        let fullUrl = url;
+        if (query) {
+            fullUrl += '?' + Object.entries(query).map(param => param.join('=')).join('&')
+        }
+        const response = await fetch(fullUrl, {
             method: 'post',
             headers: {
                 ...headers,
