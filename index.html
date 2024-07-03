@@ -98,6 +98,9 @@
                     prompt: DEFAULT_PROMPT,
                     pairs: '',
                     async generate() {
+                        if (!confirm('Text found. Replace?')) {
+                            return
+                        }
                         const exclude = Object.values(this.piles).map(pairs => Object.keys(pairs)).flat().join(', ')
                         const pairs = await generatePairs(this.config.ai, {
                             exclude,
