@@ -383,7 +383,7 @@
             },
             async migrate() {
                 console.log('db.migrate()')
-                await req('cards', 'updateMany', {
+                const response = await req('cards', 'updateMany', {
                     filter: {},
                     update: {
                         '$set': {
@@ -394,6 +394,7 @@
                         }
                     },
                 })
+                console.log({ response })
             },
             cards: {
                 async list(filter = {}) {
