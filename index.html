@@ -5,13 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <script type="module">
+        import ai from './ai.js';
         import conf from './config.js';
         import db from './db.js';
         import http from './http.js';
+        import translate from './translate.js';
 
+        window.ai = ai
         window.conf = conf
         window.db = db;
         window.http = http;
+        window.translate = translate;
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -74,8 +78,8 @@
                     <input x-model="config.ai.apiKey" placeholder="AI API key" class="my-2">
                     <label>User ID</label>
                     <input x-model="config.user.id" placeholder="User ID" class="my-2">
-                    <label>Google API key</label>
-                    <input x-model="config.google.apiKey" placeholder="Google API key" class="my-2">
+                    <label>Translator API key</label>
+                    <input x-model="config.translator.apiKey" placeholder="Translator API key" class="my-2">
                     <div class="flex justify-around my-2">
                         <button @click="save">Save</button>
                         <button @click="share">Share</button>
@@ -97,17 +101,17 @@
                             return
                         }
                         const exclude = Object.values(this.piles).map(pairs => Object.keys(pairs)).flat().join(', ')
-                        const pairs = await generatePairs(this.config.ai, {
+                        const pairs = await ai.generate(this.config.ai, {
                             exclude,
                             prompt: this.prompt
                         })
                         this.pairs = Object.entries(pairs).map(pair => pair.join(',')).join('\n')
                     },
-                    async translate() {
+                    async translateMissing() {
                         const array = this.pairs.split('\n').map(pair => pair.split(','))
                         const textsToTranslate = []
                         array.forEach(([k, v], i) => v || textsToTranslate.push({ text: k, arrayIndex: i }))
-                        const translated = await translateTexts(this.config.google.apiKey, textsToTranslate.map(t => t.text))
+                        const translated = await translate(this.config.translator, textsToTranslate.map(t => t.text))
                         textsToTranslate.forEach(({ text, arrayIndex }, i) => array[arrayIndex] = [text, translated[i]])
                         this.pairs = array.map(pair => pair.join(',')).join('\n')
                     },
@@ -136,7 +140,7 @@
 
                     <textarea x-model="pairs" rows=10 class="my-3"></textarea>
                     <div class="flex justify-around my-3">
-                        <button @click="translate">Translate</button>
+                        <button @click="translateMissing">Translate</button>
                         <button @click="add">Add</button>
                     </div>
                 </div>
@@ -231,9 +235,7 @@
 
 <script>
     const PILES = ['hard', 'medium', 'easy']
-    const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
     const DEFAULT_PROMPT = 'Generate 10 useful word pairs for a beginner learning italian'
-    const TRANSLATE_URL = 'https://translation.googleapis.com/language/translate/v2'
 
     // Load component definitions
     // document.querySelectorAll('[x-component]').forEach(component => {
@@ -264,78 +266,11 @@
         }))
     })
 
-    async function generatePairs({ apiKey }, { exclude, prompt }) {
-        const { pairs } = await chat(apiKey, [
-            {
-                role: 'system',
-                content: `You are a helpful assistant designed to generate word pairs in italian and portuguese (Portugal portuguese).
-
-                    Exclude the following italian words: ${exclude}.
-
-                    You should output JSON: { "pairs": { <it_1>: <pt_1>, <it_2>: <pt_2>, ... } }.
-                `
-            },
-            { role: 'user', content: prompt }
-        ])
-        return pairs
-    }
-
-    async function chat(apiKey, messages) {
-        console.log('chat()', messages)
-        if (!apiKey) {
-            throw new Error('Missing AI API key')
-        }
-
-        // return {
-        //     pairs: {
-        //         'ciao': 'olá',
-        //         'ragazza': 'menina',
-        //         'ragazzo': 'rapaz',
-        //         'casa': 'casa',
-        //         'libro': 'livro',
-        //         'mela': 'maçã',
-        //         'gatto': 'gato',
-        //         'cane': 'cão',
-        //         'mare': 'mar',
-        //         'scuola': 'escola',
-        //     }
-        // } // DEV
-        const response = await http.postJson({
-            url: OPENAI_API_URL,
-            headers: {
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: {
-                model: 'gpt-3.5-turbo-0125',
-                response_format: { 'type': 'json_object' },
-                messages,
-            }
-        })
-
-        const answer = JSON.parse(response.choices[0].message.content)
-        console.log({ answer })
-        return answer
-    }
-
-    async function translateTexts(apiKey, textList) {
-        console.log('translate()')
-        const response = await http.postJson({
-            url: TRANSLATE_URL,
-            query: {
-                q: textList,
-                source: 'it',
-                target: 'pt',
-                key: apiKey,
-            }
-        })
-        // return response.data.translations.map(t => t.translatedText)
-        return response.data.translations[0].translatedText.split(', ')
-    }
-
     /* TODO
       - extract JS into modules: ai, translation, cards
       - extract components into HTML files: config, ...
       - lowercase translations
+      - handle duplicate words in generator
       - add way to edit existing cards
       - ? add way to easily create DB and AI accounts (instead of implementing user accounts)
     */
