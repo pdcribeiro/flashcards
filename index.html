@@ -6,8 +6,12 @@
 
     <script type="module">
         import conf from './config.js';
+        import db from './db.js';
+        import http from './http.js';
 
         window.conf = conf
+        window.db = db;
+        window.http = http;
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -26,7 +30,6 @@
 <body class="flex justify-center bg-slate-100">
     <main x-data="{
         config: conf.load(),
-        db: null,
         loaded: false,
         piles: {
             hard: {},
@@ -34,11 +37,9 @@
             easy: {},
         },
         async init() {
-            this.db = getDb(this.config.db)
-            await this.db.auth()
-            // await this.db.migrate()
+            await db.connect(this.config.db)
 
-            const cards = await this.db.cards.list({ userId: this.config.user.id })
+            const cards = await db.cards.list({ userId: this.config.user.id })
             for (const { it, pt, pile } of cards) {
                 this.piles[pile][it] = pt
             }
@@ -123,7 +124,7 @@
                         const pile = 'hard'
                         const userId = this.config.user.id
                         const cards = array.map(([it, pt]) => ({ it, pt, pile, userId }))
-                        await this.db.cards.add(cards)
+                        await db.cards.add(cards)
                         for (const [k, v] of array) {
                             this.piles[pile][k] = v
                         }
@@ -188,7 +189,7 @@
                 async move(pile) {
                     if (pile !== this.currentPile) {
                         const [k, v] = this.pair
-                        await this.db.cards.move(k, pile)
+                        await db.cards.move(k, pile)
                         delete piles[this.currentPile][k]
                         piles[pile][k] = v
                     }
@@ -299,7 +300,7 @@
         //         'scuola': 'escola',
         //     }
         // } // DEV
-        const response = await postJson({
+        const response = await http.postJson({
             url: OPENAI_API_URL,
             headers: {
                 'Authorization': `Bearer ${apiKey}`
@@ -318,7 +319,7 @@
 
     async function translateTexts(apiKey, textList) {
         console.log('translate()')
-        const response = await postJson({
+        const response = await http.postJson({
             url: TRANSLATE_URL,
             query: {
                 q: textList,
@@ -331,106 +332,9 @@
         return response.data.translations[0].translatedText.split(', ')
     }
 
-    function getDb({ authUrl, apiKey, baseUrl }) {
-        if (!authUrl) {
-            throw new Error('Missing DB auth URL')
-        }
-        if (!apiKey) {
-            throw new Error('Missing DB API key')
-        }
-        if (!baseUrl) {
-            throw new Error('Missing DB base URL')
-        }
-
-        let accessToken
-
-        return {
-            async auth() {
-                console.log('db.auth()')
-                const response = await postJson({
-                    url: authUrl,
-                    body: {
-                        key: apiKey,
-                    },
-                })
-                accessToken = response.access_token
-                return response
-            },
-            async migrate() {
-                console.log('db.migrate()')
-                const response = await req('cards', 'updateMany', {
-                    filter: {},
-                    update: {
-                        '$set': {
-                            userId: 'diogo',
-                        },
-                        '$unset': {
-                            user_id: '',
-                        }
-                    },
-                })
-                console.log({ response })
-            },
-            cards: {
-                async list(filter = {}) {
-                    const { documents } = await req('cards', 'find', { filter })
-                    return documents
-                },
-                async add(documents) {
-                    await req('cards', 'insertMany', { documents })
-                },
-                async move(it, pile) {
-                    await req('cards', 'updateOne', {
-                        filter: { it },
-                        update: { '$set': { pile } },
-                    })
-                },
-            },
-        }
-
-        async function req(collection, action, body) {
-            console.log('db.req()', { body })
-            if (!accessToken) {
-                throw new Error('Please authenticate before calling the DB')
-            }
-            const response = await postJson({
-                url: `${baseUrl}/action/${action}`,
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                },
-                body: {
-                    ...body,
-                    dataSource: 'Cluster0',
-                    database: 'flashcards',
-                    collection,
-                },
-            })
-            return response
-        }
-    }
-
-    async function postJson({ url, query, headers, body }) {
-        console.log('postJson()')
-        let fullUrl = url;
-        if (query) {
-            fullUrl += '?' + Object.entries(query).map(param => param.join('=')).join('&')
-        }
-        const response = await fetch(fullUrl, {
-            method: 'post',
-            headers: {
-                ...headers,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(body),
-        })
-        const json = await response.json()
-        console.log({ json })
-        return json
-    }
-
     /* TODO
-      - extract components into HTML files
-      - extract JS into modules
+      - extract JS into modules: ai, translation, cards
+      - extract components into HTML files: config, ...
       - lowercase translations
       - add way to edit existing cards
       - ? add way to easily create DB and AI accounts (instead of implementing user accounts)
