@@ -11,8 +11,8 @@
         import http from './http.js';
         import translate from './translate.js';
 
-        window.ai = ai
-        window.conf = conf
+        window.ai = ai;
+        window.conf = conf;
         window.db = db;
         window.http = http;
         window.translate = translate;
@@ -21,15 +21,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
-
-<!-- Example component definition -->
-<!-- <template x-component="dropdown">
-    <div x-data="{ ...dropdown(), ...$el.parentElement.data() }">
-        <button x-on:click="open">Open</button>
-
-        <div x-show="isOpen()" x-on:click.away="close" x-text="content"></div>
-    </div>
-</template> -->
 
 <body class="flex justify-center bg-slate-100">
     <main x-data="{
@@ -66,7 +57,7 @@
                     },
                     share() {
                         conf.share()
-                    }
+                    },
                 }" class="flex flex-col">
                     <label>Database auth URL</label>
                     <input x-model="config.db.authUrl" placeholder="Database auth URL" class="my-2">
@@ -100,10 +91,9 @@
                         if (this.pairs && !confirm('Text found. Replace?')) {
                             return
                         }
-                        const exclude = Object.values(this.piles).map(pairs => Object.keys(pairs)).flat().join(', ')
                         const pairs = await ai.generate(this.config.ai, {
-                            exclude,
-                            prompt: this.prompt
+                            prompt: this.prompt,
+                            exclude: Object.values(this.piles).map(pairs => Object.keys(pairs)).flat().join(', '),
                         })
                         this.pairs = Object.entries(pairs).map(pair => pair.join(',')).join('\n')
                     },
@@ -237,26 +227,6 @@
     const PILES = ['hard', 'medium', 'easy']
     const DEFAULT_PROMPT = 'Generate 10 useful word pairs for a beginner learning italian'
 
-    // Load component definitions
-    // document.querySelectorAll('[x-component]').forEach(component => {
-    //     const componentName = `x-${component.getAttribute('x-component')}`
-    //     class Component extends HTMLElement {
-    //         connectedCallback() {
-    //             this.append(component.content.cloneNode(true))
-    //         }
-
-    //         data() {
-    //             const attributes = this.getAttributeNames()
-    //             const data = {}
-    //             attributes.forEach(attribute => {
-    //                 data[attribute] = this.getAttribute(attribute)
-    //             })
-    //             return data
-    //         }
-    //     }
-    //     customElements.define(componentName, Component)
-    // })
-
     document.addEventListener('alpine:init', async () => {
         Alpine.data('toggle', () => ({
             enabled: false,
@@ -267,10 +237,11 @@
     })
 
     /* TODO
-      - extract JS into modules: cards
-      - extract components into HTML files: config, ...
-      - handle duplicate words in generator
+      - handle duplicate words in generator. unique by pair
       - add way to edit existing cards
+      - translate both ways
+      - chat teacher that provides theory and exercises. allow storing exercises as flashcards
+      - allow choosing languages
       - ? add way to easily create DB and AI accounts (instead of implementing user accounts)
     */
 </script>
