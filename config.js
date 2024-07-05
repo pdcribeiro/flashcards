@@ -21,7 +21,7 @@ export default {
     this.migrate();
     const config = getConfigFromUrl();
     if (config) {
-      this.set(config);
+      this.save(config);
       redirectToRoot();
       return config;
     } else {
