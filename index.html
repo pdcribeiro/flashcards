@@ -3,6 +3,13 @@
 
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <script type="module">
+        import conf from './config.js';
+
+        window.conf = conf
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
@@ -18,7 +25,7 @@
 
 <body class="flex justify-center bg-slate-100">
     <main x-data="{
-        config: getSettings('config') ?? DEFAULT_CONFIG,
+        config: conf.load(),
         db: null,
         loaded: false,
         piles: {
@@ -27,8 +34,6 @@
             easy: {},
         },
         async init() {
-            this.loadSettings()
-
             this.db = getDb(this.config.db)
             await this.db.auth()
             // await this.db.migrate()
@@ -40,36 +45,23 @@
 
             this.loaded = true
         },
-        loadSettings() {
-            const param = new URLSearchParams(window.location.search).get(SETTINGS_PARAM)
-            if (param) {
-                const json = decodeURIComponent(param)
-                this.config = JSON.parse(json)
-                this.saveAllSettings()
-
-                const baseUrl = window.location.href.split('?')[0]
-                history.replaceState({}, '', baseUrl)
-            }
-        },
-        saveAllSettings() {
-            saveSettings('config', this.config)
-        },
     }" class="w-11/12 lg:w-1/2">
         <h1 class="my-3 text-xl">Flashcards</h1>
 
-        <!-- Settings -->
+        <!-- Config -->
         <div x-data="toggle">
-            <button @click="toggle">Toggle settings</button>
+            <button @click="toggle">Toggle config</button>
 
             <div x-show="enabled">
                 <div x-data="{
-                    shareSettings() {
-                        const json = JSON.stringify(this.config)
-                        const param = encodeURIComponent(json)
-                        const baseUrl = window.location.href.split('?')[0]
-                        const url = `${baseUrl}?${SETTINGS_PARAM}=${param}`
-                        navigator.clipboard.writeText(url)
+                    save() {
+                        conf.save(this.config)
+                        this.toggle()
+                        window.location.reload()
                     },
+                    share() {
+                        conf.share()
+                    }
                 }" class="flex flex-col">
                     <label>Database auth URL</label>
                     <input x-model="config.db.authUrl" placeholder="Database auth URL" class="my-2">
@@ -84,8 +76,8 @@
                     <label>Google API key</label>
                     <input x-model="config.google.apiKey" placeholder="Google API key" class="my-2">
                     <div class="flex justify-around my-2">
-                        <button @click="saveAllSettings(); toggle()">Save</button>
-                        <button @click="shareSettings">Share</button>
+                        <button @click="save">Save</button>
+                        <button @click="share">Share</button>
                     </div>
                 </div>
             </div>
@@ -237,23 +229,6 @@
 </body>
 
 <script>
-    const SETTINGS_PARAM = 'settings'
-    const DEFAULT_CONFIG = {
-        db: {
-            authUrl: '',
-            apiKey: '',
-            baseUrl: '',
-        },
-        ai: {
-            apiKey: '',
-        },
-        user: {
-            id: '',
-        },
-        google: {
-            apiKey: '',
-        },
-    }
     const PILES = ['hard', 'medium', 'easy']
     const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
     const DEFAULT_PROMPT = 'Generate 10 useful word pairs for a beginner learning italian'
@@ -453,18 +428,11 @@
         return json
     }
 
-    function saveSettings(key, data) {
-        const json = JSON.stringify(data)
-        localStorage.setItem(key, json)
-    }
-
-    function getSettings(key) {
-        const json = localStorage.getItem(key)
-        // return { ...JSON.parse(json), user: { id: '' } }
-        return JSON.parse(json)
-    }
-
     /* TODO
+      - extract components into HTML files
+      - extract JS into modules
+      - lowercase translations
+      - add way to edit existing cards
       - ? add way to easily create DB and AI accounts (instead of implementing user accounts)
     */
 </script>
