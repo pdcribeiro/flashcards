@@ -14,6 +14,6 @@ export default async function ({ apiKey }, textList) {
       key: apiKey,
     },
   });
-  // return response.data.translations.map(t => t.translatedText)
-  return response.data.translations[0].translatedText.split(', ');
+  // return response.data.translations.map(t => t.translatedText.toLowerCase())
+  return response.data.translations[0].translatedText.toLowerCase().split(', ');
 }
